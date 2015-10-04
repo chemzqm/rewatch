@@ -8,7 +8,7 @@
 
 var fs = require('fs');
 var glob = require('glob');
-var spawn = require('win-spawn');
+var exec = require('child_process').exec;
 var inherits = require('util').inherits;
 var EventEmitter = require('events').EventEmitter;
 
@@ -37,6 +37,7 @@ Rewatch.prototype.watch = function(file) {
     // fs.watch is not reliable
     // https://github.com/joyent/node/issues/3172
     fs.watchFile(file, {interval: me.interval}, function() {
+      me._file = file;
       me.emit('change');
     });
   }
@@ -45,15 +46,17 @@ Rewatch.prototype.watch = function(file) {
 Rewatch.prototype.execute = function() {
   var me = this;
   var now = new Date();
-  var commands = me._command.split(/\s+/);
   if (!me._time || now - me._time > me.interval) {
     // execute;
     me._time = now;
-    var subprocess = spawn(commands[0], commands.slice(1));
-    me.emit('execute', now, me._command);
-    subprocess.stdout.on('data', function(data) {
-      process.stdout.write(data.toString());
-    });
+    var command = me._command.replace(/\$file/, me._file);
+    exec(command, function (error, stdout, stderr) {
+      process.stdout.write(stdout);
+      process.stderr.write(stderr);
+      if (error !== null) {
+        console.log('exec error: ' + error);
+      }
+    })
   }
 };
 
